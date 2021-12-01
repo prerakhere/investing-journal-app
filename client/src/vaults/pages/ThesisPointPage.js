@@ -201,10 +201,12 @@ const ThesisPointPage = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} sx={{ mt: 2 }}>
-              {isLoading && (
-                <Skeleton variant="rectangular" width="100%" height="100px" />
-              )}
-              {!isLoading && thesisPointDescription}
+              <Typography variant="body1">
+                {isLoading && (
+                  <Skeleton variant="rectangular" width="100%" height="100px" />
+                )}
+                {!isLoading && thesisPointDescription}
+              </Typography>
             </Grid>
             <Grid item xs={12} sx={{ mt: 3 }}>
               <Typography variant="h3">
