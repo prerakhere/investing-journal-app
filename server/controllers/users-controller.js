@@ -1,10 +1,10 @@
-const bcrypt = require("bcryptjs")
-const jwt = require("jsonwebtoken")
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 
-const HttpError = require("../models/http-error")
-const User = require("../models/user")
+const HttpError = require('../models/http-error')
+const User = require('../models/user')
 
-const dotenv = require("dotenv")
+const dotenv = require('dotenv')
 dotenv.config()
 
 const jwtSecretKey = process.env.JWT_AUTH_SECRET_KEY
@@ -15,15 +15,17 @@ const signup = async (req, res, next) => {
   try {
     existingUser = await User.findOne({ email: email })
   } catch (err) {
-    const error = new HttpError(
-      "Sign up failed, unable to check if user with this email already exists or not",
-      500
+    console.log(
+      'Sign up failed, unable to check if user with this email already exists or not'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong in checking the email',
+    })
+    return
   }
   if (existingUser) {
     res.status(422).json({
-      message: "User already exists",
+      message: 'User already exists',
     })
     return
   }
@@ -31,8 +33,11 @@ const signup = async (req, res, next) => {
   try {
     hashedPassword = await bcrypt.hash(password, 12)
   } catch (err) {
-    const error = new HttpError("Could not hash password", 500)
-    return next(error)
+    console.log('Error in signup: Could not hash password')
+    res.status(500).json({
+      message: 'Something went wrong in processing password',
+    })
+    return
   }
 
   const createdUser = new User({
@@ -44,22 +49,25 @@ const signup = async (req, res, next) => {
   try {
     await createdUser.save()
   } catch (err) {
-    const error = new HttpError(
-      "Signing up failed, can't save the created user",
-      500
-    )
-    return next(error)
+    console.log("Signing up failed, can't save the created user")
+    res.status(500).json({
+      message: 'Something went wrong in saving the created user',
+    })
+    return
   }
   let token
   try {
     token = jwt.sign(
       { userId: createdUser.id, email: createdUser.email },
       jwtSecretKey,
-      { expiresIn: "1h" }
+      { expiresIn: '1d' }
     )
   } catch (err) {
-    const error = new HttpError("Signing up failed, can't generate token", 500)
-    return next(error)
+    console.log("Signing up failed, can't generate token")
+    res.status(500).json({
+      message: 'Something went wrong in generating token',
+    })
+    return
   }
 
   res
@@ -73,15 +81,17 @@ const login = async (req, res, next) => {
   try {
     existingUser = await User.findOne({ email: email })
   } catch (err) {
-    const error = new HttpError(
-      "Login failed, unable to check if user with this email already exists or not",
-      500
+    console.log(
+      'Login failed, unable to check if user with this email already exists or not'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong in checking the email',
+    })
+    return
   }
   if (!existingUser) {
     res.status(404).json({
-      message: "User not found",
+      message: 'User not found',
     })
     return
   }
@@ -89,16 +99,16 @@ const login = async (req, res, next) => {
   try {
     isValidPassword = await bcrypt.compare(password, existingUser.password)
   } catch (err) {
-    const error = new HttpError(
-      "Could not compare pw and hashed pw, try again",
-      500
-    )
-    return next(error)
+    console.log('Error in login: Could not compare pw and hashed pw, try again')
+    res.status(500).json({
+      message: 'Something went wrong in validating password',
+    })
+    return
   }
 
   if (!isValidPassword) {
     res.status(403).json({
-      message: "Incorrect Password",
+      message: 'Incorrect Password',
     })
     return
   }
@@ -108,18 +118,21 @@ const login = async (req, res, next) => {
     token = jwt.sign(
       { userId: existingUser.id, email: existingUser.email },
       jwtSecretKey,
-      { expiresIn: "1h" }
+      { expiresIn: '1d' }
     )
   } catch (err) {
-    const error = new HttpError("Login failed, could not generate token", 500)
-    return next(error)
+    console.log('Login failed, could not generate token')
+    res.status(500).json({
+      message: 'Something went wrong in generating token',
+    })
+    return
   }
 
   res.json({
     userId: existingUser.id,
     email: existingUser.email,
     token: token,
-    message: "Logged in",
+    message: 'Logged in',
   })
 }
 

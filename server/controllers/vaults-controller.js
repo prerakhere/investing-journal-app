@@ -1,8 +1,8 @@
-const HttpError = require("../models/http-error")
-const Vault = require("../models/vault")
-const User = require("../models/user")
-const ThesisPoint = require("../models/thesispoint")
-const mongoose = require("mongoose")
+const HttpError = require('../models/http-error')
+const Vault = require('../models/vault')
+const User = require('../models/user')
+const ThesisPoint = require('../models/thesispoint')
+const mongoose = require('mongoose')
 
 const getMinimalVaultById = async (req, res, next) => {
   const { userId } = req.userData
@@ -12,27 +12,30 @@ const getMinimalVaultById = async (req, res, next) => {
   try {
     vault = await Vault.findById(vaultId)
   } catch (err) {
-    const error = new HttpError(
-      "Error in getMinimalVaultById: unable to get the vault",
-      500
-    )
-    return next(error)
+    console.log('Error in getMinimalVaultById: unable to get the vault')
+    res.status(500).json({
+      message: 'Something went wrong in generating token',
+    })
+    return
   }
   if (!vault) {
-    const error = new HttpError(
-      "Error in getMinimalVaultById: Could not find a vault for the provided id",
-      404
+    console.log(
+      'Error in getMinimalVaultById: Could not find a vault for the provided id'
     )
-    return next(error)
+    res.status(404).json({
+      message: 'Could not find a vault with this id',
+    })
+    return
   }
   if (vault.vault_creator.toString() !== userId) {
-    const error = new HttpError(
-      "Error in getMinimalVaultById: this vault does not belong to user with this user id",
-      401
+    console.log(
+      'Error in getMinimalVaultById: this vault does not belong to user with this user id'
     )
-    return next(error)
+    res.status(401).json({
+      message: 'This vault does not belong to the logged in user',
+    })
+    return
   }
-  // setting getters to true removes the _ in the _id property
   res.json({
     vault: vault.toObject({ getters: true }),
   })
@@ -46,54 +49,62 @@ const getVaultById = async (req, res, next) => {
   try {
     vault = await Vault.findById(vaultId)
   } catch (err) {
-    const error = new HttpError(
-      "Error in getVaultById: unable to get the vault",
-      500
-    )
-    return next(error)
+    console.log('Error in getVaultById: unable to get the vault')
+    res.status(500).json({
+      message: 'Something went wrong, unable to get the vault',
+    })
+    return
   }
 
   if (!vault) {
-    const error = new HttpError(
-      "Error in getVaultById: Could not find a vault for the provided id",
-      404
+    console.log(
+      'Error in getVaultById: Could not find a vault for the provided id'
     )
-    return next(error)
+    res.status(404).json({
+      message: 'Could not find a vault with this id',
+    })
+    return
   }
 
   if (vault.vault_creator.toString() !== userId) {
-    const error = new HttpError(
-      "Error in getVaultById: this vault does not belong to user with this user id",
-      401
+    console.log(
+      'Error in getVaultById: this vault does not belong to user with this user id'
     )
-    return next(error)
+    res.status(401).json({
+      message: 'This vault does not belong to the logged in user',
+    })
+    return
   }
 
   let vaultWithPopulatedThesis
   try {
     vaultWithPopulatedThesis = await Vault.findById(vaultId).populate(
-      "vault_thesis"
+      'vault_thesis'
     )
   } catch (err) {
-    const error = new HttpError(
-      "Error in getVaultById: fetching vault with populated thesis points failed",
-      500
+    console.log(
+      'Error in getVaultById: fetching vault with populated thesis points failed'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong, fetching vault failed',
+    })
+    return
   }
 
   if (!vaultWithPopulatedThesis) {
-    const error = new HttpError(
-      "Error in getVaultById: vault (with populated thesis points) not found",
-      404
+    console.log(
+      'Error in getVaultById: vault (with populated thesis points) not found'
     )
-    return next(error)
+    res.status(404).json({
+      message: 'Vault not found',
+    })
+    return
   }
 
   if (vaultWithPopulatedThesis.vault_thesis.length === 0) {
     res.json({
       vault: vault.toObject({ getters: true }),
-      message: "Vault has no thesis",
+      thesis: [],
     })
   } else {
     res.json({
@@ -110,26 +121,26 @@ const getVaults = async (req, res, next) => {
 
   let userWithPopulatedVaults
   try {
-    userWithPopulatedVaults = await User.findById(userId).populate("vaults")
+    userWithPopulatedVaults = await User.findById(userId).populate('vaults')
   } catch (err) {
-    const error = new HttpError(
-      "Error in getVaults: fetching user of this user id failed",
-      500
-    )
-    return next(error)
+    console.log('Error in getVaults: fetching user of this user id failed')
+    res.status(500).json({
+      message: 'Something went wrong, fetching user failed',
+    })
+    return
   }
 
   if (!userWithPopulatedVaults) {
-    const error = new HttpError(
-      "Error in getVaults: user with this user id does not exist",
-      404
-    )
-    return next(error)
+    console.log('Error in getVaults: user with this user id does not exist')
+    res.status(404).json({
+      message: 'User with this user id not found',
+    })
+    return
   }
 
   if (userWithPopulatedVaults.vaults.length === 0) {
     res.json({
-      message: "User has no vaults",
+      message: 'User has no vaults',
     })
   } else {
     res.json({
@@ -147,19 +158,21 @@ const createVault = async (req, res, next) => {
   try {
     existingVault = await Vault.findOne({ vault_name: vault_name })
   } catch (err) {
-    const error = new HttpError(
-      "Error in createVault: failed checking if vault with this vault name exists or not",
-      500
+    console.log(
+      'Error in createVault: failed checking if vault with this vault name exists or not'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong, checking existing vault name failed',
+    })
+    return
   }
 
   if (existingVault) {
-    const error = new HttpError(
-      "Error in createVault: Vault with this name already exists",
-      422
-    )
-    return next(error)
+    console.log('Error in createVault: Vault with this name already exists')
+    res.status(422).json({
+      message: 'Vault name already exists',
+    })
+    return
   }
 
   const createdVault = new Vault({
@@ -173,19 +186,19 @@ const createVault = async (req, res, next) => {
   try {
     user = await User.findById(req.userData.userId)
   } catch (err) {
-    const error = new HttpError(
-      "Error in createVault: finding user to create vault for failed",
-      500
-    )
-    return next(error)
+    console.log('Error in createVault: finding user to create vault for failed')
+    res.status(500).json({
+      message: 'Something went wrong, fetching user failed',
+    })
+    return
   }
 
   if (!user) {
-    const error = new HttpError(
-      "Error in createVault: user does not exist",
-      404
-    )
-    return next(error)
+    console.log('Error in createVault: user does not exist')
+    res.status(404).json({
+      message: 'User does not exist',
+    })
+    return
   }
 
   try {
@@ -196,11 +209,13 @@ const createVault = async (req, res, next) => {
     await user.save({ session: sess })
     await sess.commitTransaction()
   } catch (err) {
-    const error = new HttpError(
-      "Error in createVault: something went wrong while creating vault in DB",
-      500
+    console.log(
+      'Error in createVault: something went wrong while creating vault in DB'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong while creating vault in DB',
+    })
+    return
   }
   res.status(201).json({ vault: createdVault })
 }
@@ -214,19 +229,24 @@ const updateVault = async (req, res, next) => {
   try {
     vault = await Vault.findById(vaultId)
   } catch (err) {
-    const error = new HttpError(
-      "Error in updateVault: could not fetch vault that is to updated",
-      500
+    console.log(
+      'Error in updateVault: could not fetch vault that is to updated'
     )
-    return next(error)
+    res.status(500).json({
+      message:
+        'Something went wrong, could not fetch vault that is to be updated',
+    })
+    return
   }
 
   if (vault.vault_creator.toString() !== userId) {
-    const error = new HttpError(
-      "Error in updateVault: this vault does not belong to user with this user id",
-      401
+    console.log(
+      'Error in updateVault: this vault does not belong to user with this user id'
     )
-    return next(error)
+    res.status(401).json({
+      message: 'This vault does not belong to the logged in user',
+    })
+    return
   }
 
   vault.vault_name = vault_name
@@ -235,11 +255,11 @@ const updateVault = async (req, res, next) => {
   try {
     await vault.save()
   } catch (err) {
-    const error = new HttpError(
-      "Error in updateVault: could not save the updatedVault in DB",
-      500
-    )
-    return next(error)
+    console.log('Error in updateVault: could not save the updatedVault in DB')
+    res.status(500).json({
+      message: 'Something went wrong while creating vault in DB',
+    })
+    return
   }
 
   res.status(200).json({ vault: vault.toObject({ getters: true }) })
@@ -251,29 +271,33 @@ const deleteVault = async (req, res, next) => {
   let vaultWithPopulatedVaultCreator
   try {
     vaultWithPopulatedVaultCreator = await Vault.findById(vaultId).populate(
-      "vault_creator"
+      'vault_creator'
     )
   } catch (err) {
-    const error = new HttpError(
-      "Error in deleteVault: could not fetch the vault (with populated vault creator)",
-      500
+    console.log(
+      'Error in deleteVault: could not fetch the vault (with populated vault creator)'
     )
-    return next(error)
+    res.status(500).json({
+      message: 'Something went wrong, could not fetch the vault',
+    })
+    return
   }
   if (!vaultWithPopulatedVaultCreator) {
-    const error = new HttpError(
-      "Error in deleteVault: vault does not exist",
-      404
-    )
-    return next(error)
+    console.log('Error in deleteVault: vault does not exist')
+    res.status(404).json({
+      message: 'Vault does not exist',
+    })
+    return
   }
 
   if (vaultWithPopulatedVaultCreator.vault_creator.id !== req.userData.userId) {
-    const error = new HttpError(
-      "Error in deleteVault: this vault does not belong to this user id",
-      401
+    console.log(
+      'Error in deleteVault: this vault does not belong to this user id'
     )
-    return next(error)
+    res.status(401).json({
+      message: 'This vault does not belong to the logged in user',
+    })
+    return
   }
 
   try {
@@ -287,14 +311,14 @@ const deleteVault = async (req, res, next) => {
     await ThesisPoint.deleteMany({ thesis_vault: vaultId })
     await sess.commitTransaction()
   } catch (err) {
-    const error = new HttpError(
-      "Error in deleteVault: something went wrong while deleting vault from DB",
-      500
-    )
-    return next(error)
+    console.log('Error in deleteVault: transaction')
+    res.status(500).json({
+      message: 'Something went wrong while deleting vault from DB',
+    })
+    return
   }
 
-  res.status(200).json({ message: "Successfully deleted vault" })
+  res.status(200).json({ message: 'Successfully deleted vault' })
 }
 
 exports.getMinimalVaultById = getMinimalVaultById
