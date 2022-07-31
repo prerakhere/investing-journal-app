@@ -7,7 +7,9 @@ Check it out <a href="https://investing-journal.herokuapp.com" target="_blank">h
 - [Idea behind this app](#idea-behind-this-app)
 - [Terminologies - What are vaults, thesis, thesis points, attachments?](#terminologies---what-are-vaults-thesis-thesis-points-attachments)
 - [Running on local machine](#running-on-local-machine)
+- [Performance Analysis](#performance-analysis)
 - [Bug Reporting](#bug-reporting)
+
 
 ### Idea behind this app
 
@@ -30,6 +32,15 @@ generate revenues and profits. Through this app, one can journal out why they in
 - start client and server with suitable start scripts and on suitable ports
 - You won't be able to use MongoDB database and AWS S3 bucket storage unless you create and set them up. Refer documentations/youtube videos for that.
 - If you made it till here, then either make .env file for the keys or enter the keys seperately at required places.
+
+### Performance Analysis
+#### Measure first
+- It is well said that if performance of an application is to be improved, it has to be measured first.
+- Below is a lighthouse audit snapshot of the app which takes a good 5-6 seconds to load.
+<img width="665" alt="investing-journal-pagespeed-test" src="https://user-images.githubusercontent.com/39647029/182028844-86c3f2a8-7fa2-44dc-8d74-517c64dfa80c.png">
+
+- A deeper look into the audit suggests optimizations like reducing the number of requests, avoiding chaining of critical requests for initial load, enabling text compression, etc so as to improve the web vitals.
+- I am going to optimize for these web vitals and will measure the lighthouse audit report post optimizations. Will be interesting to compare the report then and watch out for anymore suggestions to improve upon.
 
 ### Bug Reporting
 
