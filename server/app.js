@@ -1,15 +1,18 @@
 const express = require("express")
+const path = require("path")
 const mongoose = require("mongoose")
 const cors = require("cors")
 const dotenv = require("dotenv")
 const usersRoutes = require("./routes/users-routes")
 const vaultsRoutes = require("./routes/vaults-routes")
 const HttpError = require("./models/http-error")
+const compression = require("compression")
 
 dotenv.config()
 
 const app = express()
 
+app.use(compression())
 app.use(express.urlencoded({ extended: true }))
 app.use(cors(), express.json())
 
@@ -28,6 +31,13 @@ const url = process.env.MONGODB_CONNECTION_URL
 
 app.use("/api/vaults", vaultsRoutes)
 app.use("/api/users", usersRoutes)
+
+// middlewares for deploying to heroku
+app.use(express.static(path.join(__dirname, "/client/build")))
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "/client/build", "index.html"))
+})
 
 app.use((req, res, next) => {
   const error = new HttpError("Can't find this API route", 404)
