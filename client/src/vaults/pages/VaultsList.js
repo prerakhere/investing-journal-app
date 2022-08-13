@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react"
+import React, { useState, useEffect, useReducer, useContext } from "react"
 import {
   Button,
   Container,
@@ -14,15 +14,86 @@ import { AuthContext } from "../../shared/context/auth-context"
 import DialogForm from "../../shared/components/DialogForm/DialogForm"
 import VaultItem from "../components/VaultItem"
 
+const initialState = {
+  vaultName: "",
+  vaultSector: "",
+  loadedVaults: [],
+  hasNoVaults: false,
+  showVaultNameError: false,
+}
+
+function vaultsListReducer(state, action) {
+  switch (action.type) {
+    case "form field": {
+      return {
+        ...state,
+        [action.fieldName]: action.payload,
+      }
+    }
+    case "set loaded vaults": {
+      return {
+        ...state,
+        loadedVaults: [...action.payload],
+        hasNoVaults: false,
+      }
+    }
+    case "set no vaults": {
+      return {
+        ...state,
+        hasNoVaults: true,
+      }
+    }
+    case "cancel add vault dialog": {
+      return {
+        ...state,
+        vaultName: "",
+        vaultSector: "",
+        showVaultNameError: false,
+      }
+    }
+    case "error: vault name empty": {
+      return {
+        ...state,
+        showVaultNameError: true,
+      }
+    }
+    case "remove vault name error": {
+      return {
+        ...state,
+        showVaultNameError: false,
+      }
+    }
+    case "set vault list non-empty": {
+      return {
+        ...state,
+        hasNoVaults: false,
+      }
+    }
+    case "close add vault dialog": {
+      return {
+        ...state,
+        vaultName: "",
+        vaultSector: "",
+        showVaultNameError: false,
+      }
+    }
+    default:
+      return state
+  }
+}
+
 const VaultsList = () => {
   const auth = useContext(AuthContext)
   const { isLoading, sendRequest } = useHttpClient()
+  const [state, dispatch] = useReducer(vaultsListReducer, initialState)
   const [openAddDialog, setOpenAddDialog] = useState(false)
-  const [showVaultNameError, setShowVaultNameError] = useState(false)
-  const [vaultName, setVaultName] = useState("")
-  const [vaultSector, setVaultSector] = useState("")
-  const [loadedVaults, setLoadedVaults] = useState([])
-  const [hasNoVaults, setHasNoVaults] = useState(false)
+  const {
+    vaultName,
+    vaultSector,
+    loadedVaults,
+    hasNoVaults,
+    showVaultNameError,
+  } = state
 
   useEffect(() => {
     const fetchVaults = async () => {
@@ -37,11 +108,10 @@ const VaultsList = () => {
           }
         )
         if (responseData.vaults) {
-          setLoadedVaults(responseData.vaults)
-          setHasNoVaults(false)
+          dispatch({ type: "set loaded vaults", payload: responseData.vaults })
         }
         if (responseData.message) {
-          setHasNoVaults(true)
+          dispatch({ type: "set no vaults" })
         }
       } catch (err) {}
     }
@@ -52,24 +122,21 @@ const VaultsList = () => {
     setOpenAddDialog(true)
   }
 
-  const cancelActionHandler = () => {
-    setVaultName("")
-    setVaultSector("")
-    setShowVaultNameError(false)
+  const cancelAddVaultHandler = () => {
+    dispatch({ type: "cancel add vault dialog" })
     setOpenAddDialog(false)
   }
 
   const addVaultSubmitHandler = async (event) => {
     event.preventDefault()
     if (vaultName.length === 0) {
-      setShowVaultNameError(true)
+      dispatch({ type: "error: vault name empty" })
       return
     }
-    setHasNoVaults(false)
+    dispatch({ type: "set vault list non-empty" })
     try {
       setOpenAddDialog(false)
-      setVaultName("")
-      setVaultSector("")
+      dispatch({ type: "close add vault dialog" })
       await sendRequest(
         "http://localhost:5004/api/vaults",
         "POST",
@@ -94,12 +161,27 @@ const VaultsList = () => {
             "Content-Type": "application/json",
           }
         )
-        setLoadedVaults(responseData.vaults)
-        setHasNoVaults(false)
+        dispatch({ type: "set loaded vaults", payload: responseData.vaults })
       } catch (err) {}
     })()
   }
 
+  const onVaultNameChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "vaultName",
+      payload: e.target.value,
+    })
+    if (vaultName.length + 1 > 0) dispatch({ type: "remove vault name error" })
+  }
+
+  const onVaultSectorChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "vaultSector",
+      payload: e.target.value,
+    })
+  }
   return (
     <>
       <Container>
@@ -154,7 +236,7 @@ const VaultsList = () => {
               takeActionBtn="Add"
               cancelBtn="Cancel"
               takeActionSubmitHandler={addVaultSubmitHandler}
-              cancelActionHandler={cancelActionHandler}
+              cancelActionHandler={cancelAddVaultHandler}
             >
               <Grid container item xs={12} justifyContent="space-around">
                 <Grid item xs={10} sm={5}>
@@ -162,10 +244,7 @@ const VaultsList = () => {
                     variant="standard"
                     label="Vault Name"
                     value={vaultName}
-                    onChange={(e) => {
-                      if (vaultName.length + 1 > 0) setShowVaultNameError(false)
-                      setVaultName(e.target.value)
-                    }}
+                    onChange={(e) => onVaultNameChangeHandler(e)}
                     error={showVaultNameError}
                     helperText={
                       showVaultNameError ? "Vault must have a name!" : ""
@@ -177,7 +256,7 @@ const VaultsList = () => {
                     variant="standard"
                     label="Vault Sector"
                     value={vaultSector}
-                    onChange={(e) => setVaultSector(e.target.value)}
+                    onChange={(e) => onVaultSectorChangeHandler(e)}
                   />
                 </Grid>
               </Grid>

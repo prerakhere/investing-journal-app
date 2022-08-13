@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from "react"
+import React, { useReducer, useContext, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   Typography,
@@ -22,6 +22,117 @@ import { AuthContext } from "../../shared/context/auth-context"
 import theme from "../../config/theme"
 import FileUploadChip from "./FileUploadChip"
 
+const initialState = {
+  selectedFilesToUpload: [],
+  thesisPointTitle: "",
+  thesisPointDescription: "",
+  uploadedFiles: [],
+  isUploadingFile: false,
+  isDeletingFile: false,
+  isSavingThesis: false,
+  showThesisPointTitleError: false,
+  numberOfSelectedFiles: 0,
+}
+
+function addThesisPointDialogReducer(state, action) {
+  switch (action.type) {
+    case "form field": {
+      return {
+        ...state,
+        [action.fieldName]: action.payload,
+      }
+    }
+    case "error: thesis point title empty": {
+      return {
+        ...state,
+        showThesisPointTitleError: true,
+      }
+    }
+    case "remove thesis point title error": {
+      return {
+        ...state,
+        showThesisPointTitleError: false,
+      }
+    }
+    case "set saving thesis to true": {
+      return {
+        ...state,
+        isSavingThesis: true,
+      }
+    }
+    case "close add thesis point dialog": {
+      return {
+        ...state,
+        numberOfSelectedFiles: 0,
+        selectedFilesToUpload: [],
+        uploadedFiles: [],
+        thesisPointTitle: "",
+        thesisPointDescription: "",
+        isDeletingFile: false,
+        isSavingThesis: false,
+        isUploadingFile: false,
+        showThesisPointTitleError: false,
+      }
+    }
+    case "set uploading file to true": {
+      return {
+        ...state,
+        isUploadingFile: true,
+      }
+    }
+    case "set uploading file to false": {
+      return {
+        ...state,
+        isUploadingFile: false,
+      }
+    }
+    case "set uploaded file": {
+      return {
+        ...state,
+        uploadedFiles: [
+          ...action.payload.uploadedFiles,
+          ...action.payload.filesArr,
+        ],
+      }
+    }
+    case "upload button handler clean up": {
+      return {
+        ...state,
+        selectedFilesToUpload: [],
+        numberOfSelectedFiles: 0,
+      }
+    }
+    case "set files on file input change": {
+      return {
+        ...state,
+        selectedFilesToUpload: [...action.payload],
+        numberOfSelectedFiles: action.payload.length,
+      }
+    }
+    case "set is deleting file to true": {
+      return {
+        ...state,
+        isDeletingFile: true,
+      }
+    }
+    case "set is deleting file to false": {
+      return {
+        ...state,
+        isDeletingFile: false,
+      }
+    }
+    case "set files after deleting an uploaded file": {
+      return {
+        ...state,
+        uploadedFiles: [...action.payload],
+        isDeletingFile: false,
+      }
+    }
+    default:
+      return state
+  }
+}
+
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />
 })
@@ -38,26 +149,31 @@ const AddThesisPointDialog = (props) => {
 
   const auth = useContext(AuthContext)
   const selectedFilesRef = useRef()
-  const [thesisPointTitle, setThesisPointTitle] = useState("")
-  const [thesisPointDescription, setThesisPointDescription] = useState("")
-  const [numberOfSelectedFiles, setNumberOfSelectedFiles] = useState(0)
-  const [selectedFilesToUpload, setSelectedFilesToUpload] = useState([])
-  const [uploadedFiles, setUploadedFiles] = useState([])
-  const [showThesisPointTitleError, setShowThesisPointTitleError] =
-    useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isDeletingFile, setIsDeletingFile] = useState(false)
-  const [isSavingThesis, setIsSavingThesis] = useState(false)
+  const [state, dispatch] = useReducer(
+    addThesisPointDialogReducer,
+    initialState
+  )
+  const {
+    selectedFilesToUpload,
+    thesisPointTitle,
+    thesisPointDescription,
+    uploadedFiles,
+    isUploadingFile,
+    isDeletingFile,
+    isSavingThesis,
+    showThesisPointTitleError,
+    numberOfSelectedFiles,
+  } = state
   const currDate = new Date().toString().substring(4, 15)
   const formattedDate = currDate.slice(0, 6) + "," + currDate.slice(6)
 
   const onSaveBtnClick = async (e) => {
     e.preventDefault()
     if (thesisPointTitle.length === 0) {
-      setShowThesisPointTitleError(true)
+      dispatch({ type: "error: thesis point title empty" })
       return
     }
-    setIsSavingThesis(true)
+    dispatch({ type: "set saving thesis to true" })
     try {
       await sendRequest(
         `http://localhost:5004/api/vaults/${vaultId}`,
@@ -72,23 +188,20 @@ const AddThesisPointDialog = (props) => {
           "Content-Type": "application/json",
         }
       )
+      dispatch({ type: "close add thesis point dialog" })
       selectedFilesRef.current.value = ""
-      setNumberOfSelectedFiles(0)
-      setSelectedFilesToUpload([])
-      setUploadedFiles([])
-      setThesisPointTitle("")
-      setThesisPointDescription("")
-      setIsDeletingFile(false)
-      setIsSavingThesis(false)
       setOpenDialog(false)
       shouldRerender(!rerender)
       navigate(`/vaults/${vaultId}`, { replace: true })
-    } catch (err) {}
+    } catch (err) {
+      if (err.message === "") {
+      }
+    }
   }
 
   const uploadBtnHandler = () => {
     let filesArr = []
-    setIsUploading(true)
+    dispatch({ type: "set uploading file to true" })
     Promise.all(
       selectedFilesToUpload.map(async (file) => {
         let data = new FormData()
@@ -103,34 +216,29 @@ const AddThesisPointDialog = (props) => {
             }
           )
           filesArr.push(fileResponseData)
-          setUploadedFiles([...uploadedFiles, ...filesArr])
+          dispatch({
+            type: "set uploaded file",
+            payload: { uploadedFiles, filesArr },
+          })
         } catch (err) {}
       })
-    ).then(() => setIsUploading(false))
-    setSelectedFilesToUpload([])
-    setNumberOfSelectedFiles(0)
+    ).then(() => {
+      dispatch({ type: "set uploading file to false" })
+    })
+    dispatch({ type: "upload button handler clean up" })
     selectedFilesRef.current.value = ""
   }
 
   const onFilesInputChange = (e) => {
     let fileArr = Array.from(e.target.files)
-    setSelectedFilesToUpload(fileArr)
-    setNumberOfSelectedFiles(fileArr.length)
+    dispatch({ type: "set files on file input change", payload: fileArr })
   }
 
   const closeAddThesisPointDialog = async () => {
     await discardUploadedFiles()
-    setIsUploading(false)
     selectedFilesRef.current.value = ""
-    setSelectedFilesToUpload([])
-    setUploadedFiles([])
-    setThesisPointTitle("")
-    setNumberOfSelectedFiles(0)
-    setThesisPointDescription("")
-    setShowThesisPointTitleError(false)
-    setIsDeletingFile(false)
-    setIsSavingThesis(false)
     setOpenDialog(false)
+    dispatch({ type: "close add thesis point dialog" })
   }
 
   const discardUploadedFiles = async () => {
@@ -152,7 +260,7 @@ const AddThesisPointDialog = (props) => {
   }
 
   const deleteUploadedFile = async (fileName) => {
-    setIsDeletingFile(true)
+    dispatch({ type: "set is deleting file to true" })
     try {
       const responseData = await sendRequest(
         `http://localhost:5004/api/vaults/${vaultId}/upload`,
@@ -166,9 +274,30 @@ const AddThesisPointDialog = (props) => {
           Authorization: "Bearer " + auth.token,
         }
       )
-      setIsDeletingFile(false)
-      setUploadedFiles([...responseData.updatedUploadedFiles])
-    } catch (err) {}
+      dispatch({
+        type: "set files after deleting an uploaded file",
+        payload: responseData.updatedUploadedFiles,
+      })
+    } catch (err) {
+      dispatch({ type: "set is deleting file to false" })
+    }
+  }
+  const onThesisPointTitleChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "thesisPointTitle",
+      payload: e.target.value,
+    })
+    if (thesisPointTitle.length + 1 > 0) {
+      dispatch({ type: "remove thesis point title error" })
+    }
+  }
+  const onThesisPointDescChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "thesisPointDescription",
+      payload: e.target.value,
+    })
   }
   return (
     <>
@@ -188,7 +317,7 @@ const AddThesisPointDialog = (props) => {
             </Typography>
             <LoadingButton
               onClick={onSaveBtnClick}
-              disabled={isUploading}
+              disabled={isUploadingFile || isDeletingFile}
               loading={isSavingThesis}
               sx={{
                 color: theme.palette.primary.main,
@@ -215,11 +344,7 @@ const AddThesisPointDialog = (props) => {
                   label="Thesis Point Title"
                   variant="standard"
                   value={thesisPointTitle}
-                  onChange={(e) => {
-                    if (thesisPointTitle.length + 1 > 0)
-                      setShowThesisPointTitleError(false)
-                    setThesisPointTitle(e.target.value)
-                  }}
+                  onChange={(e) => onThesisPointTitleChangeHandler(e)}
                   error={showThesisPointTitleError}
                   helperText={
                     showThesisPointTitleError
@@ -236,7 +361,7 @@ const AddThesisPointDialog = (props) => {
                   multiline
                   rows={6}
                   value={thesisPointDescription}
-                  onChange={(e) => setThesisPointDescription(e.target.value)}
+                  onChange={(e) => onThesisPointDescChangeHandler(e)}
                   fullWidth
                 />
               </Grid>
@@ -261,7 +386,7 @@ const AddThesisPointDialog = (props) => {
                       onChange={onFilesInputChange}
                       ref={selectedFilesRef}
                     />
-                    <Button component="span" disabled={isUploading}>
+                    <Button component="span" disabled={isUploadingFile}>
                       Select Files
                     </Button>
                   </label>
@@ -269,7 +394,7 @@ const AddThesisPointDialog = (props) => {
                 <Grid item sx={{ ml: 2 }}>
                   <LoadingButton
                     onClick={uploadBtnHandler}
-                    loading={isUploading}
+                    loading={isUploadingFile}
                     disabled={selectedFilesToUpload.length === 0}
                   >
                     Upload
@@ -289,7 +414,7 @@ const AddThesisPointDialog = (props) => {
 
               {uploadedFiles.length === 0 &&
                 selectedFilesToUpload.length === 0 &&
-                !isUploading && (
+                !isUploadingFile && (
                   <Grid item xs={12} sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ color: "gray" }}>
                       No uploaded files
@@ -301,7 +426,7 @@ const AddThesisPointDialog = (props) => {
                   <Typography variant="body1">Uploaded Files:</Typography>
                 </Grid>
               )}
-              {isUploading && (
+              {isUploadingFile && (
                 <Grid item sx={{ mt: 1 }}>
                   <Skeleton variant="text" width="250px" height="44px" />
                   <Skeleton variant="text" width="250px" height="44px" />
@@ -312,7 +437,7 @@ const AddThesisPointDialog = (props) => {
                 {isDeletingFile && (
                   <CircularProgress sx={{ mt: 1 }} size={28} />
                 )}
-                {!isUploading &&
+                {!isUploadingFile &&
                   !isDeletingFile &&
                   uploadedFiles.length > 0 &&
                   uploadedFiles.map((uploadedFile) => (
