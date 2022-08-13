@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useContext } from "react"
+import React, {
+  useState,
+  useEffect,
+  useReducer,
+  useContext,
+  Suspense,
+  lazy,
+} from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   Container,
@@ -19,24 +26,64 @@ import {
 import { AuthContext } from "../../shared/context/auth-context"
 import { useHttpClient } from "../../shared/hooks/http-hook"
 import DialogForm from "../../shared/components/DialogForm/DialogForm"
-import EditThesisPointDialog from "../components/EditThesisPointDialog"
+// import EditThesisPointDialog from "../components/EditThesisPointDialog"
 import FileChip from "../components/FileChip"
+
+const EditThesisPointDialog = lazy(() =>
+  import(
+    /* webpackChunkName: "EditThesisPointDialog" */ "../components/EditThesisPointDialog"
+  )
+)
+
+const initialState = {
+  vaultName: "",
+  thesisPointTitle: "",
+  thesisPointDateCreated: "",
+  thesisPointDescription: "",
+  thesisPointAttachments: [],
+}
+
+function thesisPointPageReducer(state, action) {
+  switch (action.type) {
+    case "set thesis point details": {
+      return {
+        ...state,
+        thesisPointTitle: action.payload.thesis_point_title,
+        thesisPointDateCreated: action.payload.thesis_point_date_created,
+        thesisPointDescription: action.payload.thesis_point_description,
+        thesisPointAttachments: [...action.payload.thesis_point_attachments],
+      }
+    }
+    case "set vault details": {
+      return {
+        ...state,
+        vaultName: action.payload.vault_name,
+      }
+    }
+    default:
+      return state
+  }
+}
 
 const ThesisPointPage = () => {
   const navigate = useNavigate()
   const { vaultId, thesisPointId } = useParams()
   const { isLoading, sendRequest } = useHttpClient()
   const auth = useContext(AuthContext)
-  const [vaultName, setVaultName] = useState("")
-  const [thesisPointTitle, setThesisPointTitle] = useState("")
-  const [thesisPointDateCreated, setThesisPointDateCreated] = useState("")
-  const [thesisPointDescription, setThesisPointDescription] = useState("")
-  const [thesisPointAttachments, setThesisPointAttachments] = useState([])
+  const [state, dispatch] = useReducer(thesisPointPageReducer, initialState)
   const [openEditThesisPointDialog, setOpenEditThesisPointDialog] =
     useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
   const [rerender, setRerender] = useState(false)
-  const [anchorEl, setAnchorEl] = React.useState(null)
+  const [anchorEl, setAnchorEl] = useState(null)
+  const {
+    vaultName,
+    thesisPointTitle,
+    thesisPointDateCreated,
+    thesisPointDescription,
+    thesisPointAttachments,
+  } = state
+
   useEffect(() => {
     const fetchThesisPointDetails = async () => {
       try {
@@ -49,16 +96,10 @@ const ThesisPointPage = () => {
             "Content-Type": "application/json",
           }
         )
-        setThesisPointDateCreated(
-          responseData.thesisPoint.thesis_point_date_created
-        )
-        setThesisPointTitle(responseData.thesisPoint.thesis_point_title)
-        setThesisPointDescription(
-          responseData.thesisPoint.thesis_point_description
-        )
-        setThesisPointAttachments([
-          ...responseData.thesisPoint.thesis_point_attachments,
-        ])
+        dispatch({
+          type: "set thesis point details",
+          payload: responseData.thesisPoint,
+        })
       } catch (err) {}
     }
     fetchThesisPointDetails()
@@ -75,7 +116,10 @@ const ThesisPointPage = () => {
             "Content-Type": "application/json",
           }
         )
-        setVaultName(responseData.vault.vault_name)
+        dispatch({
+          type: "set vault details",
+          payload: responseData.vault,
+        })
       } catch (err) {}
     }
     fetchVaultDetails()
@@ -252,19 +296,21 @@ const ThesisPointPage = () => {
         takeActionSubmitHandler={deleteThesisPointSubmitHandler}
         cancelActionHandler={deleteThesisPointCancelHandler}
       ></DialogForm>
-      {!isLoading && (
-        <EditThesisPointDialog
-          vault_name={vaultName}
-          thesis_point_date_created={thesisPointDateCreated}
-          thesis_point_title={thesisPointTitle}
-          thesis_point_description={thesisPointDescription}
-          thesis_point_attachments={thesisPointAttachments}
-          openDialog={openEditThesisPointDialog}
-          setOpenDialog={setOpenEditThesisPointDialog}
-          shouldRerender={shouldRerender}
-          rerender={rerender}
-        ></EditThesisPointDialog>
-      )}
+      <Suspense fallback={<div></div>}>
+        {!isLoading && openEditThesisPointDialog && (
+          <EditThesisPointDialog
+            vault_name={vaultName}
+            thesis_point_date_created={thesisPointDateCreated}
+            thesis_point_title={thesisPointTitle}
+            thesis_point_description={thesisPointDescription}
+            thesis_point_attachments={thesisPointAttachments}
+            openDialog={openEditThesisPointDialog}
+            setOpenDialog={setOpenEditThesisPointDialog}
+            shouldRerender={shouldRerender}
+            rerender={rerender}
+          ></EditThesisPointDialog>
+        )}
+      </Suspense>
     </>
   )
 }

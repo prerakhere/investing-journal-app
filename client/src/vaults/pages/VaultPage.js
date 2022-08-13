@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useContext } from "react"
+import React, {
+  useState,
+  useEffect,
+  useReducer,
+  useContext,
+  Suspense,
+  lazy,
+} from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   Button,
@@ -29,27 +36,88 @@ import {
 import { AuthContext } from "../../shared/context/auth-context"
 import { useHttpClient } from "../../shared/hooks/http-hook"
 import DialogForm from "../../shared/components/DialogForm/DialogForm"
-import AddThesisPointDialog from "../components/AddThesisPointDialog"
+// import AddThesisPointDialog from "../components/AddThesisPointDialog"
 import ThesisPointItem from "../components/ThesisPointItem"
 
+const AddThesisPointDialog = lazy(() =>
+  import(
+    /* webpackChunkName: "AddThesisPointDialog" */ "../components/AddThesisPointDialog"
+  )
+)
+
+const initialState = {
+  vaultName: "",
+  editedVaultName: "",
+  vaultSector: "",
+  editedVaultSector: "",
+  showVaultNameError: false,
+  loadedThesisPoints: [],
+}
+
+function vaultPageReducer(state, action) {
+  switch (action.type) {
+    case "form-field": {
+      return {
+        ...state,
+        [action.fieldName]: action.payload,
+      }
+    }
+    case "set vault details on initial fetch": {
+      return {
+        ...state,
+        vaultName: action.payload.vault.vault_name,
+        editedVaultName: action.payload.vault.vault_name,
+        vaultSector: action.payload.vault.vault_sector,
+        editedVaultSector: action.payload.vault.vault_sector,
+        loadedThesisPoints: [...action.payload.thesis],
+      }
+    }
+    case "error: edited vault name empty": {
+      return {
+        ...state,
+        showVaultNameError: true,
+      }
+    }
+    case "update new vault name and sector": {
+      return {
+        ...state,
+        vaultName: action.payload.vault.vault_name,
+        editedVaultName: action.payload.vault.vault_name,
+        vaultSector: action.payload.vault.vault_sector,
+        editedVaultSector: action.payload.vault.vault_sector,
+      }
+    }
+    case "remove vault name error": {
+      return {
+        ...state,
+        showVaultNameError: false,
+      }
+    }
+    default:
+      return state
+  }
+}
 const VaultPage = () => {
   const navigate = useNavigate()
   let { vaultId } = useParams()
   const { isLoading, sendRequest } = useHttpClient()
   const auth = useContext(AuthContext)
 
-  const [vaultName, setVaultName] = useState("")
-  const [editedVaultName, setEditedVaultName] = useState("")
-  const [vaultSector, setVaultSector] = useState("")
-  const [editedVaultSector, setEditedVaultSector] = useState("")
+  const [state, dispatch] = useReducer(vaultPageReducer, initialState)
   const [openEditDialog, setOpenEditDialog] = useState(false)
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false)
-  const [showVaultNameError, setShowVaultNameError] = useState(false)
   const [openAddThesisPointDialog, setOpenAddThesisPointDialog] =
     useState(false)
-  const [loadedThesisPoints, setLoadedThesisPoints] = useState([])
   const [rerender, setRerender] = useState(false)
-  const [anchorEl, setAnchorEl] = React.useState(null)
+  const [anchorEl, setAnchorEl] = useState(null)
+  const {
+    vaultName,
+    editedVaultName,
+    vaultSector,
+    editedVaultSector,
+    showVaultNameError,
+    loadedThesisPoints,
+  } = state
 
   useEffect(() => {
     const fetchVaultDetails = async () => {
@@ -62,11 +130,12 @@ const VaultPage = () => {
             Authorization: "Bearer " + auth.token,
           }
         )
-        setVaultName(responseData.vault.vault_name)
-        setEditedVaultName(responseData.vault.vault_name)
-        setVaultSector(responseData.vault.vault_sector)
-        setEditedVaultSector(responseData.vault.vault_sector)
-        setLoadedThesisPoints(responseData.thesis)
+        console.log("------")
+        console.log(responseData)
+        dispatch({
+          type: "set vault details on initial fetch",
+          payload: responseData,
+        })
       } catch (err) {}
     }
     fetchVaultDetails()
@@ -85,10 +154,28 @@ const VaultPage = () => {
     setOpenEditDialog(true)
   }
 
+  const onEditVaultNameChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "editedVaultName",
+      payload: e.target.value,
+    })
+    if (editedVaultName.length + 1 > 0) {
+      dispatch({ type: "remove vault name error" })
+    }
+  }
+
+  const onEditVaultSectorChangeHandler = (e) => {
+    dispatch({
+      type: "form field",
+      fieldName: "editedVaultSector",
+      payload: e.target.value,
+    })
+  }
   const editVaultSubmitHandler = async (e) => {
     e.preventDefault()
     if (editedVaultName.length === 0) {
-      setShowVaultNameError(true)
+      dispatch({ type: "error: edited vault name empty" })
       return
     }
     try {
@@ -105,10 +192,10 @@ const VaultPage = () => {
           "Content-Type": "application/json",
         }
       )
-      setVaultName(responseData.vault.vault_name)
-      setEditedVaultName(responseData.vault.vault_name)
-      setVaultSector(responseData.vault.vault_sector)
-      setEditedVaultSector(responseData.vault.vault_sector)
+      dispatch({
+        type: "update new vault name and sector",
+        payload: responseData,
+      })
     } catch (err) {}
   }
   // delete handlers
@@ -366,18 +453,13 @@ const VaultPage = () => {
           takeActionSubmitHandler={editVaultSubmitHandler}
           cancelActionHandler={cancelActionHandler}
         >
-          {/* make a AddVaultForm component here */}
           <Grid container item xs={12} justifyContent="space-around">
             <Grid item xs={10} sm={5}>
               <TextField
                 variant="standard"
                 label="Vault Name"
                 value={editedVaultName}
-                onChange={(e) => {
-                  if (editedVaultName.length + 1 > 0)
-                    setShowVaultNameError(false)
-                  setEditedVaultName(e.target.value)
-                }}
+                onChange={(e) => onEditVaultNameChangeHandler(e)}
                 error={showVaultNameError}
                 helperText={showVaultNameError ? "Vault must have a name!" : ""}
               />
@@ -387,19 +469,22 @@ const VaultPage = () => {
                 variant="standard"
                 label="Vault Sector"
                 value={editedVaultSector}
-                onChange={(e) => setEditedVaultSector(e.target.value)}
+                onChange={(e) => onEditVaultSectorChangeHandler(e)}
               />
             </Grid>
           </Grid>
         </DialogForm>
-
-        <AddThesisPointDialog
-          vault_name={vaultName}
-          openDialog={openAddThesisPointDialog}
-          setOpenDialog={setOpenAddThesisPointDialog}
-          shouldRerender={shouldRerender}
-          rerender={rerender}
-        />
+        <Suspense fallback={<div></div>}>
+          {openAddThesisPointDialog && (
+            <AddThesisPointDialog
+              vault_name={vaultName}
+              openDialog={openAddThesisPointDialog}
+              setOpenDialog={setOpenAddThesisPointDialog}
+              shouldRerender={shouldRerender}
+              rerender={rerender}
+            />
+          )}
+        </Suspense>
       </Container>
     </>
   )
