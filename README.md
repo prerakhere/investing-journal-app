@@ -54,7 +54,7 @@ generate revenues and profits. Through this app, one can journal out why they in
 
 
 #### Text Compression
-- Enabled text compression of text based resources like CSS, JS so as to minimize total bytes to be transferred over the network.
+- Enabled compression (gzip) of text based resources like CSS, JS so as to minimize total bytes to be transferred over the network.
 - Below snapshot of the network tab shows original vs compressed sizes of the files.
   <img width="470" alt="after-text-compression" src="https://user-images.githubusercontent.com/39647029/184468757-e88c1c3e-3498-4aa3-867c-7015ba9a1ff9.png">
 
